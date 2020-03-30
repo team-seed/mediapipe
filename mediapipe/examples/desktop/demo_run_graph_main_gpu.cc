@@ -30,9 +30,17 @@
 #include "mediapipe/gpu/gpu_buffer.h"
 #include "mediapipe/gpu/gpu_shared_data_internal.h"
 
+#include "mediapipe/calculators/util/landmarks_to_render_data_calculator.pb.h"
+#include "mediapipe/framework/formats/landmark.pb.h"
+
+#include "mediapipe/calculators/util/rect_to_render_data_calculator.pb.h"
+#include "mediapipe/framework/formats/rect.pb.h"
+
 constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "output_video";
 constexpr char kWindowName[] = "MediaPipe";
+constexpr char kLandmarkStream[] = "multi_hand_landmarks";
+constexpr char kHandRectStream[] = "multi_hand_rects";
 
 DEFINE_string(
     calculator_graph_config_file, "",
@@ -88,6 +96,10 @@ DEFINE_string(output_video_path, "",
   LOG(INFO) << "Start running the calculator graph.";
   ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller poller,
                    graph.AddOutputStreamPoller(kOutputStream));
+  ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller landmarkPoller,
+                   graph.AddOutputStreamPoller(kLandmarkStream));
+  ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller handRectPoller,
+                   graph.AddOutputStreamPoller(kHandRectStream));
   MP_RETURN_IF_ERROR(graph.StartRun({}));
 
   LOG(INFO) << "Start grabbing and processing frames.";
@@ -131,8 +143,30 @@ DEFINE_string(output_video_path, "",
     // Get the graph result packet, or stop if that fails.
     mediapipe::Packet packet;
     if (!poller.Next(&packet)) break;
+    mediapipe::Packet landmarkPacket;
+    if (!landmarkPoller.Next(&landmarkPacket)) break;
+    mediapipe::Packet handRectPacket;
+    if (!handRectPoller.Next(&handRectPacket)) break;
+
     std::unique_ptr<mediapipe::ImageFrame> output_frame;
 
+    auto &landmark = landmarkPacket.Get<std::vector<::mediapipe::NormalizedLandmarkList>>();
+    auto &handRect = handRectPacket.Get<std::vector<::mediapipe::NormalizedRect>>();
+
+    /*
+    LOG(INFO) << "landmark\n";
+    for(auto &lml : landmark){
+      LOG(INFO) << lml.landmark_size() << std::endl;
+      for(auto &lm : lml.landmark()){
+        LOG(INFO) << lm.x() << " " << lm.y() << " " << lm.z() << std::endl;
+      }
+    }
+    LOG(INFO) << "handRect\n";
+    for(auto &hr : handRect){
+      LOG(INFO) << hr.x_center() << " " << hr.y_center() << std::endl;
+    }
+    */
+    
     // Convert GpuBuffer to ImageFrame.
     MP_RETURN_IF_ERROR(gpu_helper.RunInGlContext(
         [&packet, &output_frame, &gpu_helper]() -> ::mediapipe::Status {
