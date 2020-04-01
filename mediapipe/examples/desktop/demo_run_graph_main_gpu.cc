@@ -36,11 +36,18 @@
 #include "mediapipe/calculators/util/rect_to_render_data_calculator.pb.h"
 #include "mediapipe/framework/formats/rect.pb.h"
 
+#include "mediapipe/HandGesture/HandGesture.hpp"
+
 constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "output_video";
 constexpr char kWindowName[] = "MediaPipe";
 constexpr char kLandmarkStream[] = "multi_hand_landmarks";
 constexpr char kHandRectStream[] = "multi_hand_rects";
+
+//////////////////////////////////////
+// Global variables
+HandGesture::HandGesture hg;
+//////////////////////////////////////
 
 DEFINE_string(
     calculator_graph_config_file, "",
@@ -153,19 +160,52 @@ DEFINE_string(output_video_path, "",
     auto &landmark = landmarkPacket.Get<std::vector<::mediapipe::NormalizedLandmarkList>>();
     auto &handRect = handRectPacket.Get<std::vector<::mediapipe::NormalizedRect>>();
 
-    /*
-    LOG(INFO) << "landmark\n";
-    for(auto &lml : landmark){
-      LOG(INFO) << lml.landmark_size() << std::endl;
-      for(auto &lm : lml.landmark()){
-        LOG(INFO) << lm.x() << " " << lm.y() << " " << lm.z() << std::endl;
+    // check the number of each before init multiHandNum
+    if(landmark.size() > hg.config.handNum || handRect.size() > hg.config.handNum){
+      LOG(ERROR) << "size of landmark or handRect larger than config.handNum "
+        << landmark.size() << " " << handRect.size() << std::endl;
+    }
+    else if(landmark.size() == 0 || handRect.size() == 0){
+      LOG(ERROR) << "size of landmark or handRect equal to zero "
+        << landmark.size() << " " << handRect.size() << std::endl;
+    }
+    else{
+      hg.multiHandNum = landmark.size();
+      hg.multiRectNum = handRect.size();
+
+      // copy landmarks to HandGesture
+      for(int hand=0; hand<hg.multiHandNum; hand++){
+        int joint=0;
+        for(auto &lm : landmark[hand].landmark()){
+          hg.landmarks[hand][joint] = {lm.x(), lm.y(), lm.z()};
+          //LOG(INFO) << hand << ", " << joint << hg.landmarks[hand][joint] << std::endl;
+          ++joint;
+        }
+      }
+      
+      // landmark to gesture
+      hg.l2g.landmarkToGesture(&hg);
+
+      // Create a new segment with given name and size
+      boost::interprocess::managed_shared_memory segment(
+          boost::interprocess::open_or_create, 
+          hg.config.shmName.c_str(), hg.config.shmSize);
+
+      // Construct an variable in shared memory
+      HandGesture::Gesture *gesture = segment.find<HandGesture::Gesture>(
+          hg.config.shmbbCenterGestureName.c_str()).first;
+      
+      // check gesture
+      if(gesture == 0){
+        LOG(ERROR) << "gesture shared memory failed\n";
+      }
+
+      // copy handRect to shm
+      for(int hand=0; hand<hg.multiRectNum; hand++){
+        gesture[hand].lm = {handRect[hand].x_center(), handRect[hand].y_center(), 0};
+        //LOG(INFO) << hand << " " << gesture[hand].lm << std::endl;
       }
     }
-    LOG(INFO) << "handRect\n";
-    for(auto &hr : handRect){
-      LOG(INFO) << hr.x_center() << " " << hr.y_center() << std::endl;
-    }
-    */
     
     // Convert GpuBuffer to ImageFrame.
     MP_RETURN_IF_ERROR(gpu_helper.RunInGlContext(
@@ -215,6 +255,13 @@ DEFINE_string(output_video_path, "",
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  // get config from files
+  hg.getHandGestureConfig();  // file IO
+  
+  // init shared memory
+  hg.initShm();
+
   ::mediapipe::Status run_status = RunMPPGraph();
   if (!run_status.ok()) {
     LOG(ERROR) << "Failed to run the graph: " << run_status.message();
