@@ -38,16 +38,15 @@
 
 #include "mediapipe/HandGesture/HandGesture.hpp"
 
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/containers/vector.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+
 constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "output_video";
 constexpr char kWindowName[] = "MediaPipe";
 constexpr char kLandmarkStream[] = "multi_hand_landmarks";
 constexpr char kHandRectStream[] = "multi_hand_rects";
-
-//////////////////////////////////////
-// Global variables
-HandGesture::HandGesture hg;
-//////////////////////////////////////
 
 DEFINE_string(
     calculator_graph_config_file, "",
@@ -59,7 +58,7 @@ DEFINE_string(output_video_path, "",
               "Full path of where to save result (.mp4 only). "
               "If not provided, show result in a window.");
 
-::mediapipe::Status RunMPPGraph() {
+::mediapipe::Status RunMPPGraph(HandGesture::HandGesture &hg) {
   std::string calculator_graph_config_contents;
   MP_RETURN_IF_ERROR(mediapipe::file::GetContents(
       FLAGS_calculator_graph_config_file, &calculator_graph_config_contents));
@@ -161,7 +160,7 @@ DEFINE_string(output_video_path, "",
     auto &handRect = handRectPacket.Get<std::vector<::mediapipe::NormalizedRect>>();
 
     // check the number of each before init multiHandNum
-    if(landmark.size() > hg.config.handNum || handRect.size() > hg.config.handNum){
+    if(landmark.size() > HandGesture::handNum || handRect.size() > HandGesture::handNum){
       LOG(ERROR) << "size of landmark or handRect larger than config.handNum "
         << landmark.size() << " " << handRect.size() << std::endl;
     }
@@ -182,29 +181,17 @@ DEFINE_string(output_video_path, "",
           ++joint;
         }
       }
-      
-      // landmark to gesture
-      hg.l2g.landmarkToGesture(&hg);
 
-      // Create a new segment with given name and size
-      boost::interprocess::managed_shared_memory segment(
-          boost::interprocess::open_or_create, 
-          hg.config.shmName.c_str(), hg.config.shmSize);
-
-      // Construct an variable in shared memory
-      HandGesture::Gesture *gesture = segment.find<HandGesture::Gesture>(
-          hg.config.shmbbCenterGestureName.c_str()).first;
-      
-      // check gesture
-      if(gesture == 0){
-        LOG(ERROR) << "gesture shared memory failed\n";
-      }
-
-      // copy handRect to shm
+      // copy handRect to HandGesture
       for(int hand=0; hand<hg.multiRectNum; hand++){
-        gesture[hand].lm = {handRect[hand].x_center(), handRect[hand].y_center(), 0};
+        hg.bbCenter[hand] = {handRect[hand].x_center(), handRect[hand].y_center(), 0};
         //LOG(INFO) << hand << " " << gesture[hand].lm << std::endl;
       }
+      
+      // landmark to gesture
+      hg.landmarkToGesture();
+
+      LOG(INFO) << "finished landmarkToGesture\n";
     }
     
     // Convert GpuBuffer to ImageFrame.
@@ -255,14 +242,26 @@ DEFINE_string(output_video_path, "",
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-  // get config from files
-  hg.getHandGestureConfig();  // file IO
   
-  // init shared memory
-  hg.initShm();
+  struct ShmPreventer{
+    ShmPreventer(){boost::interprocess::shared_memory_object::remove(HandGesture::shmName);}
+    ~ShmPreventer(){boost::interprocess::shared_memory_object::remove(HandGesture::shmName);}
+  }shmPreventer;
+  
+  // Create a new segment with given name and size
+  boost::interprocess::managed_shared_memory segment(
+      boost::interprocess::open_or_create, HandGesture::shmName, HandGesture::shmSize);
 
-  ::mediapipe::Status run_status = RunMPPGraph();
+  // Construct an variable in shared memory
+  HandGesture::Gesture *gesture = segment.construct<HandGesture::Gesture>(
+    HandGesture::shmbbCenterGestureName)[HandGesture::handNum]();
+  if(gesture == 0){
+    LOG(ERROR) << "can't find shared memory\n";
+  }
+
+  HandGesture::HandGesture hg(gesture);
+
+  ::mediapipe::Status run_status = RunMPPGraph(hg);
   if (!run_status.ok()) {
     LOG(ERROR) << "Failed to run the graph: " << run_status.message();
     return EXIT_FAILURE;
