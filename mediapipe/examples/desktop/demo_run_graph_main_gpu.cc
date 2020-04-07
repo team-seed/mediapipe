@@ -93,9 +93,11 @@ DEFINE_string(output_video_path, "",
   if (!save_video) {
     cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
 #if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
+    int fourcc = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
+    capture.set(cv::CAP_PROP_FOURCC, fourcc);
     capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
     capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-    capture.set(cv::CAP_PROP_FPS, 30);
+    capture.set(cv::CAP_PROP_FPS, 60);
 #endif
   }
 
@@ -220,7 +222,7 @@ DEFINE_string(output_video_path, "",
       if (!writer.isOpened()) {
         LOG(INFO) << "Prepare video writer.";
         writer.open(FLAGS_output_video_path,
-                    mediapipe::fourcc('a', 'v', 'c', '1'),  // .mp4
+                    mediapipe::fourcc('M', 'J', 'P', 'G'),  // .mjpg
                     capture.get(cv::CAP_PROP_FPS), output_frame_mat.size());
         RET_CHECK(writer.isOpened());
       }
