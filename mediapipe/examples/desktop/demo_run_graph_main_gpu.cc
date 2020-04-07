@@ -160,7 +160,7 @@ DEFINE_string(output_video_path, "",
     auto &handRect = handRectPacket.Get<std::vector<::mediapipe::NormalizedRect>>();
 
     // check the number of each before init multiHandNum
-    if(landmark.size() > HandGesture::handNum || handRect.size() > HandGesture::handNum){
+    if(landmark.size() > ShmConfig::handNum || handRect.size() > ShmConfig::handNum){
       LOG(ERROR) << "size of landmark or handRect larger than config.handNum "
         << landmark.size() << " " << handRect.size() << std::endl;
     }
@@ -244,17 +244,17 @@ int main(int argc, char** argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   
   struct ShmPreventer{
-    ShmPreventer(){boost::interprocess::shared_memory_object::remove(HandGesture::shmName);}
-    ~ShmPreventer(){boost::interprocess::shared_memory_object::remove(HandGesture::shmName);}
+    ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
+    ~ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
   }shmPreventer;
   
   // Create a new segment with given name and size
   boost::interprocess::managed_shared_memory segment(
-      boost::interprocess::open_or_create, HandGesture::shmName, HandGesture::shmSize);
+      boost::interprocess::open_or_create, ShmConfig::shmName, ShmConfig::shmSize);
 
   // Construct an variable in shared memory
-  HandGesture::Gesture *gesture = segment.construct<HandGesture::Gesture>(
-    HandGesture::shmbbCenterGestureName)[HandGesture::handNum]();
+  ShmConfig::Gesture *gesture = segment.construct<ShmConfig::Gesture>(
+    ShmConfig::shmbbCenterGestureName)[ShmConfig::handNum]();
   if(gesture == 0){
     LOG(ERROR) << "can't find shared memory\n";
   }
