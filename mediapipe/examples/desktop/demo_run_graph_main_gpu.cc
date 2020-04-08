@@ -102,8 +102,10 @@ DEFINE_string(output_video_path, "",
   }
 
   LOG(INFO) << "Start running the calculator graph.";
+  #ifdef IMSHOW_ENABLE
   ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller poller,
                    graph.AddOutputStreamPoller(kOutputStream));
+  #endif
   ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller landmarkPoller,
                    graph.AddOutputStreamPoller(kLandmarkStream));
   ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller handRectPoller,
@@ -149,8 +151,10 @@ DEFINE_string(output_video_path, "",
         }));
 
     // Get the graph result packet, or stop if that fails.
+    #ifdef IMSHOW_ENABLE
     mediapipe::Packet packet;
     if (!poller.Next(&packet)) break;
+    #endif
     mediapipe::Packet landmarkPacket;
     if (!landmarkPoller.Next(&landmarkPacket)) break;
     mediapipe::Packet handRectPacket;
@@ -196,6 +200,7 @@ DEFINE_string(output_video_path, "",
       LOG(INFO) << "finished landmarkToGesture\n";
     }
     
+    #ifdef IMSHOW_ENABLE
     // Convert GpuBuffer to ImageFrame.
     MP_RETURN_IF_ERROR(gpu_helper.RunInGlContext(
         [&packet, &output_frame, &gpu_helper]() -> ::mediapipe::Status {
@@ -233,6 +238,7 @@ DEFINE_string(output_video_path, "",
       const int pressed_key = cv::waitKey(5);
       if (pressed_key >= 0 && pressed_key != 255) grab_frames = false;
     }
+    #endif
   }
 
   LOG(INFO) << "Shutting down.";
