@@ -165,33 +165,40 @@ DEFINE_string(output_video_path, "",
     auto &landmark = landmarkPacket.Get<std::vector<::mediapipe::NormalizedLandmarkList>>();
     auto &handRect = handRectPacket.Get<std::vector<::mediapipe::NormalizedRect>>();
 
+    #ifdef DEFINE_MODE
+    HandGesture::lm2DArray lmCopy;
+    #endif
+
     // check the number of each before init multiHandNum
-    if(landmark.size() > ShmConfig::handNum || handRect.size() > ShmConfig::handNum){
-      LOG(ERROR) << "size of landmark or handRect larger than config.handNum "
-        << landmark.size() << " " << handRect.size() << std::endl;
-    }
-    else if(landmark.size() == 0 || handRect.size() == 0){
-      LOG(ERROR) << "size of landmark or handRect equal to zero "
-        << landmark.size() << " " << handRect.size() << std::endl;
+    if(landmark.size() > ShmConfig::handNum){
+      LOG(INFO) << "size of landmark larger than config.handNum: "
+        << landmark.size() << std::endl;
     }
     else{
+      if(landmark.size() == 0){
+        LOG(INFO) << "size of landmark equal to zero" << std::endl;
+      }
+
       hg.multiHandNum = landmark.size();
-      hg.multiRectNum = handRect.size();
 
       // copy landmarks to HandGesture
       for(int hand=0; hand<hg.multiHandNum; hand++){
         int joint=0;
         for(auto &lm : landmark[hand].landmark()){
           hg.landmarks[hand][joint] = {lm.x(), lm.y(), lm.z()};
-          //LOG(INFO) << hand << ", " << joint << hg.landmarks[hand][joint] << std::endl;
           ++joint;
         }
       }
 
+      #ifdef DEFINE_MODE
+      for(int joint=0; joint<ShmConfig::jointNum; joint++){
+        lmCopy[0][joint] = hg.landmarks[0][joint];
+      }
+      #endif
+
       // copy handRect to HandGesture
-      for(int hand=0; hand<hg.multiRectNum; hand++){
+      for(int hand=0; hand<hg.multiHandNum; hand++){
         hg.bbCenter[hand] = {handRect[hand].x_center(), handRect[hand].y_center(), 0};
-        //LOG(INFO) << hand << " " << gesture[hand].lm << std::endl;
       }
       
       // landmark to gesture
@@ -239,7 +246,7 @@ DEFINE_string(output_video_path, "",
       if (pressed_key >= 0 && pressed_key != 255){
         grab_frames = false;
         #ifdef DEFINE_MODE
-        hg.defineMode(output_frame_mat);
+        hg.defineMode(output_frame_mat, lmCopy);
         #endif
       }
     }
@@ -256,18 +263,14 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   
-  struct ShmPreventer{
-    ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
-    ~ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
-  }shmPreventer;
-  
   // Create a new segment with given name and size
   boost::interprocess::managed_shared_memory segment(
       boost::interprocess::open_or_create, ShmConfig::shmName, ShmConfig::shmSize);
 
   // Construct an variable in shared memory
-  ShmConfig::Gesture *gesture = segment.construct<ShmConfig::Gesture>(
-    ShmConfig::shmbbCenterGestureName)[ShmConfig::handNum]();
+  ShmConfig::Gesture *gesture = segment.find<ShmConfig::Gesture>(
+      ShmConfig::shmbbCenterGestureName).first;
+      
   if(gesture == 0){
     LOG(ERROR) << "can't find shared memory\n";
   }
