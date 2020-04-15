@@ -1,4 +1,3 @@
-cd mediapipe && git clone https://github.com/team-seed/HandGesture.git && cd ..
 bazel build -c opt --copt -DMESA_EGL_NO_X11_HEADERS \
     --copt="-DGAME_MODE" \
     mediapipe/examples/desktop/multi_hand_tracking:multi_hand_tracking_gpu
