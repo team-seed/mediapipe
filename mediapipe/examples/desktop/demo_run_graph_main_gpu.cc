@@ -264,11 +264,15 @@ int main(int argc, char** argv) {
   // Create a new segment with given name and size
   boost::interprocess::managed_shared_memory segment(
       boost::interprocess::open_or_create, ShmConfig::shmName, ShmConfig::shmSize);
-
+  ShmConfig::Gesture *gesture;
+  #ifdef GAME_MODE
   // Construct an variable in shared memory
-  ShmConfig::Gesture *gesture = segment.find<ShmConfig::Gesture>(
+  gesture = segment.find<ShmConfig::Gesture>(
       ShmConfig::shmbbCenterGestureName).first;
-      
+  #else
+  gesture = segment.construct<ShmConfig::Gesture>(
+      ShmConfig::shmbbCenterGestureName)();
+  #endif
   if(gesture == 0){
     LOG(ERROR) << "can't find shared memory\n";
   }
