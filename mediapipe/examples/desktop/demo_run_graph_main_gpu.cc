@@ -92,13 +92,11 @@ DEFINE_string(output_video_path, "",
   const bool save_video = !FLAGS_output_video_path.empty();
   if (!save_video) {
     cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
-#if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
     int fourcc = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
     capture.set(cv::CAP_PROP_FOURCC, fourcc);
-    capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-    capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+    capture.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    capture.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
     capture.set(cv::CAP_PROP_FPS, 60);
-#endif
   }
 
   LOG(INFO) << "Start running the calculator graph.";
