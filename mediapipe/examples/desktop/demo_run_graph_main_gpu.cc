@@ -261,10 +261,19 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   
+  #ifndef GAME_MODE
+  // remove shmName before usage and after usage
+  struct ShmPreventer{
+    ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
+    ~ShmPreventer(){boost::interprocess::shared_memory_object::remove(ShmConfig::shmName);}
+  }shmPreventer;
+  #endif
+
   // Create a new segment with given name and size
   boost::interprocess::managed_shared_memory segment(
       boost::interprocess::open_or_create, ShmConfig::shmName, ShmConfig::shmSize);
   ShmConfig::Gesture *gesture;
+
   #ifdef GAME_MODE
   // Construct an variable in shared memory
   gesture = segment.find<ShmConfig::Gesture>(
@@ -273,6 +282,7 @@ int main(int argc, char** argv) {
   gesture = segment.construct<ShmConfig::Gesture>(
       ShmConfig::shmbbCenterGestureName)();
   #endif
+
   if(gesture == 0){
     LOG(ERROR) << "can't find shared memory\n";
   }
@@ -286,5 +296,10 @@ int main(int argc, char** argv) {
   } else {
     LOG(INFO) << "Success!";
   }
+
+  #ifndef GAME_MODE
+  segment.destroy<ShmConfig::Gesture>(ShmConfig::shmbbCenterGestureName);
+  #endif
+  
   return EXIT_SUCCESS;
 }
