@@ -169,12 +169,12 @@ DEFINE_string(output_video_path, "",
 
     // check the number of each before init multiHandNum
     if(landmark.size() > ShmConfig::handNum){
-      LOG(INFO) << "size of landmark larger than config.handNum: "
-        << landmark.size() << std::endl;
+      //LOG(INFO) << "size of landmark larger than config.handNum: "
+      //  << landmark.size() << std::endl;
     }
     else{
       if(landmark.size() == 0){
-        LOG(INFO) << "size of landmark equal to zero" << std::endl;
+        //LOG(INFO) << "size of landmark equal to zero" << std::endl;
       }
 
       hg.multiHandNum = landmark.size();
@@ -202,7 +202,7 @@ DEFINE_string(output_video_path, "",
       // landmark to gesture
       hg.landmarkToGesture();
 
-      LOG(INFO) << "finished landmarkToGesture\n";
+      //LOG(INFO) << "finished landmarkToGesture\n";
     }
     
     #ifdef IMSHOW_ENABLE
@@ -230,7 +230,7 @@ DEFINE_string(output_video_path, "",
     cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
     if (save_video) {
       if (!writer.isOpened()) {
-        LOG(INFO) << "Prepare video writer.";
+        //LOG(INFO) << "Prepare video writer.";
         writer.open(FLAGS_output_video_path,
                     mediapipe::fourcc('M', 'J', 'P', 'G'),  // .mjpg
                     capture.get(cv::CAP_PROP_FPS), output_frame_mat.size());
