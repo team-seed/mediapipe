@@ -94,9 +94,9 @@ DEFINE_string(output_video_path, "",
     cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
     int fourcc = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
     capture.set(cv::CAP_PROP_FOURCC, fourcc);
-    capture.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-    capture.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
-    capture.set(cv::CAP_PROP_FPS, 60);
+    capture.set(cv::CAP_PROP_FRAME_WIDTH, hg.camWidth);
+    capture.set(cv::CAP_PROP_FRAME_HEIGHT, hg.camHeight);
+    capture.set(cv::CAP_PROP_FPS, hg.fps);
   }
 
   LOG(INFO) << "Start running the calculator graph.";
